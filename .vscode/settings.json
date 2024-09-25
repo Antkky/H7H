@@ -1,0 +1,15 @@
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/.gitattributes": true,
+        "**/.gitignore": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        "**/rithmic_ssl_cert_auth_params": true,
+        "__pycache__": false,
+        "pb2": false
+    }
+}
