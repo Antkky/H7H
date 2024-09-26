@@ -68,26 +68,30 @@ class Environment:
         self.line_price, = self.ax_price.plot([], [], color='blue', label='Close Price')
 
         # Initialize scatter plots for buy and sell markers
-        self.buy_scatter = self.ax_price.scatter([], [], marker='^', color='green', label='Buy', s=150)
-        self.sell_scatter = self.ax_price.scatter([], [], marker='v', color='red', label='Sell', s=150)
+        self.buy_scatter = self.ax_price.scatter([], [], marker='^', color='green', label='Buy', s=25)
+        self.sell_scatter = self.ax_price.scatter([], [], marker='v', color='red', label='Sell', s=25)
 
         # Make sure to add the legend for better visualization
         self.ax_pnl.legend()
 
         #########################################################################################################################################
 
-    # Re-Render
     def render(self):
         # Check if this is the first rendering
         if self._first_rendering:
             self._first_rendering = False
             plt.ion()
-
-            # Set initial x and y limits for PnL
+            plt.show(block=False)
+            # Set initial x and y limits for PnL and Price
             self.ax_pnl.set_xlim(self.data.index[0], self.data.index[-1])
-            initial_y_min = self.data['Close'].min() * 0.95
-            initial_y_max = self.data['Close'].max() * 1.05 
-            self.ax_pnl.set_ylim(initial_y_min, initial_y_max)
+            initial_pnl_y_min = self.data['Close'].min() * 0.95
+            initial_pnl_y_max = self.data['Close'].max() * 1.05
+            self.ax_pnl.set_ylim(initial_pnl_y_min, initial_pnl_y_max)
+
+            self.ax_price.set_xlim(self.data.index[0], self.data.index[-1])
+            initial_price_y_min = self.data['Close'].min() * 0.95
+            initial_price_y_max = self.data['Close'].max() * 1.05
+            self.ax_price.set_ylim(initial_price_y_min, initial_price_y_max)
 
         if self.step > 0:
             # Update PnL lines
@@ -104,27 +108,35 @@ class Environment:
             # Dynamically update y-limits for PnL
             current_min_y = min(self.profit_history + self.unrealized_pnl_history) * 1.05
             current_max_y = max(self.profit_history + self.unrealized_pnl_history) * 1.05
+            if current_min_y == current_max_y:
+                current_max_y += 1
             self.ax_pnl.set_ylim(current_min_y, current_max_y)
 
             # Update the axes dynamically for Price
             self.ax_price.relim()
             self.ax_price.autoscale_view()
 
-            # Plot buy and sell signals (optional)
+            # Plot buy and sell signals
             buy_indices = [i for i in range(len(self.buy_signals)) if self.buy_signals[i][1] > 0]
             sell_indices = [i for i in range(len(self.sell_signals)) if self.sell_signals[i][1] > 0]
-            # Prepare y-values for signals
-            buy_y = [self.buy_signals[i][1] for i in buy_indices] if buy_indices else []
-            sell_y = [self.sell_signals[i][1] for i in sell_indices] if sell_indices else []
-            # Plot buy signals
-            if buy_indices:
-                self.buy_scatter.set_offsets(np.column_stack((self.data.index[buy_indices].astype(np.int64) // 10**9, buy_y)))
-            # Plot sell signals
-            if sell_indices:
-                self.sell_scatter.set_offsets(np.column_stack((self.data.index[sell_indices].astype(np.int64) // 10**9, sell_y)))
 
+            # Extract timestamps and y-values for buy/sell signals
+            buy_times = [self.buy_signals[i][0] for i in buy_indices]
+            buy_prices = [self.buy_signals[i][1] for i in buy_indices]
+
+            sell_times = [self.sell_signals[i][0] for i in sell_indices]
+            sell_prices = [self.sell_signals[i][1] for i in sell_indices]
+
+            # Set offsets for buy and sell signals (timestamps and corresponding price)
+            if buy_indices:
+                self.buy_scatter.set_offsets(np.column_stack((buy_times, buy_prices)))
+            if sell_indices:
+                self.sell_scatter.set_offsets(np.column_stack((sell_times, sell_prices)))
+
+            # Draw and pause for dynamic updates
             plt.draw()
             plt.pause(0.0005)
+
 
     # Move forward
     def forward(self, action):
