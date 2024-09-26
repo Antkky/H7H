@@ -26,6 +26,7 @@ class environment:
         self._total_reward = 0
         self._realized_pnl = 0
         self._unrealized_pnl = 0  # Add tracking for unrealized PnL
+        self.reward_history = []
         self.profit_history = []  # To track total profit over time
         self.unrealized_pnl_history = []  # Track unrealized PnL for plotting
         self.buy_signals = []  # Track Buy signals
@@ -40,23 +41,32 @@ class environment:
         df1 = df1.set_index('Time')
         self.data = df1
 
-        # Initialize a plot figure
-        self.fig, self.ax1 = plt.subplots()
-        self.ax1.set_title('Realized, and Unrealized PnL')
-        self.ax1.set_xlabel('Time')
+        # Initialize a plot figure for PnL
+        self.fig_pnl, self.ax_pnl = plt.subplots()
+        self.ax_pnl.set_title('Realized and Unrealized PnL')
+        self.ax_pnl.set_xlabel('Time')
+        self.ax_pnl.set_ylabel('PnL', color='green')
 
-        # Create a second y-axis for profit
-        self.ax2 = self.ax1.twinx()
-        self.ax2.set_ylabel('PnL', color='green')
+        # Initialize a plot figure for Price
+        self.fig_price, self.ax_price = plt.subplots()
+        self.ax_price.set_title('Price')
+        self.ax_price.set_xlabel('Time')
+        self.ax_price.set_ylabel('Price', color='blue')
+        
+        # Create lines for realized PnL, unrealized PnL, and close price
+        self.line_realized_pnl, = self.ax_pnl.plot([], [], color='green', label='Realized PnL')
+        self.line_unrealized_pnl, = self.ax_pnl.plot([], [], color='blue', label='Unrealized PnL')
+        self.ax_pnl.grid(True)
 
-        # Create lines for close price, realized PnL, and unrealized PnL
-        self.line_realized_pnl, = self.ax2.plot([], [], color='green', label='Realized PnL')
-        self.line_unrealized_pnl, = self.ax2.plot([], [], color='blue', label='Unrealized PnL')
-        self.ax1.grid(True)
+        # Initialize scatter plots for buy and sell markers
+        self.buy_scatter = self.ax_pnl.scatter([], [], marker='^', color='green', label='Buy', s=100)
+        self.sell_scatter = self.ax_pnl.scatter([], [], marker='v', color='red', label='Sell', s=100)
 
-        # Initialize scatter plots for position markers
-        self.buy_scatter = self.ax1.scatter([], [], marker='^', color='green', label='Buy', s=100)
-        self.sell_scatter = self.ax1.scatter([], [], marker='v', color='red', label='Sell', s=100)
+        # Make sure to add the legend for better visualization
+        self.ax_pnl.legend()
+
+        # Initialize the price line
+        self.line_price, = self.ax_price.plot([], [], color='blue', label='Close Price')
 
 
     # returns state based on steps
@@ -74,28 +84,42 @@ class environment:
         return state
     
     def render(self):
+        # Check if this is the first rendering
         if self._first_rendering:
             self._first_rendering = False
-            plt.ioff()  # Turn off interactive mode
-            self.ax1.set_xlim(self.data.index[0], self.data.index[-1])  # Fix the x-axis
+            plt.ion()  # Turn on interactive mode for dynamic updating
 
-            self.line_realized_pnl.set_data(self.data.index[:self.step], self.profit_history[:self.step])
-            self.line_unrealized_pnl.set_data(self.data.index[:self.step], self.unrealized_pnl_history[:self.step])
+            # Set initial x and y limits for PnL
+            self.ax_pnl.set_xlim(self.data.index[0], self.data.index[-1])
+            initial_y_min = self.data['Close'].min() * 0.95
+            initial_y_max = self.data['Close'].max() * 1.05
+            self.ax_pnl.set_ylim(initial_y_min, initial_y_max)
 
-            self.ax1.relim()
-            self.ax2.relim()
-            self.ax2.autoscale_view()
-            plt.draw()
-            plt.pause(0.0005)
+            # Set initial x and y limits for Price
+            self.ax_price.set_xlim(self.data.index[0], self.data.index[-1])
+            self.ax_price.set_ylim(self.data['Close'].min() * 0.95, self.data['Close'].max() * 1.05)
 
-        # Update the lines with the new step, keeping the x-axis fixed
+        # Update PnL lines
         self.line_realized_pnl.set_data(self.data.index[:self.step], self.profit_history[:self.step])
         self.line_unrealized_pnl.set_data(self.data.index[:self.step], self.unrealized_pnl_history[:self.step])
 
-        self.ax1.relim()
-        self.ax2.relim()
-        self.ax2.autoscale_view()
+        # Update Price line
+        self.line_price.set_data(self.data.index[:self.step], self.data['Close'].iloc[:self.step])
 
+        # Update the axes dynamically for PnL
+        self.ax_pnl.relim()
+        self.ax_pnl.autoscale_view()
+        
+        # Dynamically update y-limits for PnL
+        current_min_y = min(self.profit_history + self.unrealized_pnl_history) * 1.05
+        current_max_y = max(self.profit_history + self.unrealized_pnl_history) * 1.05
+        self.ax_pnl.set_ylim(current_min_y, current_max_y)
+
+        # Update the axes dynamically for Price
+        self.ax_price.relim()
+        self.ax_price.autoscale_view()
+
+        # Plot buy and sell signals (optional)
         if self.step > 0:  # Ensure there are steps to plot
             buy_indices = [i for i in range(len(self.buy_signals)) if self.buy_signals[i][1] > 0]
             sell_indices = [i for i in range(len(self.sell_signals)) if self.sell_signals[i][1] > 0]
@@ -117,6 +141,7 @@ class environment:
 
 
 
+
     # render entire chart
     def render_all(self, title=None):
         plt.plot(self.data['Close'])
@@ -127,6 +152,7 @@ class environment:
         new_state = self.current_data()
 
         reward = self.calculate_reward(action)  # Calculate the reward based on action
+        self.reward_history.append(reward)  # Store the reward
         done = self.step >= len(self.data) - self.window_size  # Stop when reaching the end
 
         # Add current total realized and unrealized PnL to history for plotting
