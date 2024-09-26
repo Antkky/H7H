@@ -1,7 +1,7 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
+import torch # type: ignore
+import torch.nn as nn # type: ignore
+import torch.optim as optim # type: ignore
+import torch.nn.functional as F # type: ignore
 import numpy as np
 import os
 
@@ -72,4 +72,4 @@ class QTrainer:
         loss.backward()
         self.optimizer.step()
 
-device = torch.device("cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

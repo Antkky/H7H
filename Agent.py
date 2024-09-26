@@ -1,8 +1,8 @@
 from Environment import *
 from Model import *
-import torch
+import torch # type: ignore
 import random
-import pandas as pd
+import pandas as pd # type: ignore
 from collections import deque
 import tracemalloc
 
@@ -76,7 +76,6 @@ class Agent:
                 total_reward += reward
             
             self.env.close()
-
             self.update_epsilon()  # Update exploration rate after each episode
             print(f"Episode: {episode}\nReward: {total_reward}\nProfit: {realprofit}")
 
