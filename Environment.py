@@ -237,7 +237,9 @@ class Environment:
         self.step = 0
         self._realized_pnl = 0
         self._unrealized_pnl = 0
-        self.profit_history = [0]  # Initialize with a starting point for profit
+        self.profit_history = []  # Initialize with a starting point for profit
+        self.reward_history = []
+        self.unrealized_pnl_history = []
         self._total_reward = 0
         self.position = None
         self.entry_price = None
