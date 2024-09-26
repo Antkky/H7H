@@ -6,6 +6,8 @@ import pandas as pd # type: ignore
 from collections import deque
 from sklearn.preprocessing import MinMaxScaler, StandardScaler # type: ignore
 import tracemalloc
+import sys
+
 
 # Constants for memory and training
 MAX_MEMORY = 100_000
@@ -13,17 +15,20 @@ BATCH_SIZE = 32
 LR = 0.05
 
 class Agent:
-    def __init__(self, df):
+    def __init__(self, df, args=""):
         self.window_size = 30
-        
-
+        self.file = args
         self.n_trades = 0
         self.epsilon = 1.0
         self.gamma = 0.9
 
         self.memory = deque(maxlen=MAX_MEMORY)
 
-        self.model = LSTM_Q_Net(input_size=10, hidden_size=256, output_size=2).to(device)   # Initializes  Neural Network
+        self.model = LSTM_Q_Net(input_size=10, hidden_size=256, output_size=2).to(device) # Initializes  Neural Network
+        
+        if (len(args) > 1):
+            self.model.load_state_dict(torch.load(self.file, weights_only=True))
+
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma, BATCH_SIZE=BATCH_SIZE) # Initializes         Trainer
         self.env = Environment(df=df, window_size=self.window_size)                         # Initializes     Environment
         
@@ -92,8 +97,7 @@ class Agent:
 
 if __name__ == "__main__":
     df = pd.read_csv('trade_data.csv')
-    # vv Data preprocessing vv
-
+    
     features = df.drop(columns=["Time"])
 
     min_max_scaler = MinMaxScaler()
@@ -101,8 +105,11 @@ if __name__ == "__main__":
 
     df_minmax = pd.DataFrame(scaled_minmax, columns=features.columns)
 
-    print(df_minmax)
+    if(len(sys.argv) > 1):
+        arg = sys.argv[1]
+        
+    else:
+        arg = ""
 
-    # ^^ Data preprocessing ^^
-    agent = Agent(df_minmax)
+    agent = Agent(df_minmax, arg)
     agent.run(episodes=100)

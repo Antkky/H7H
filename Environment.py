@@ -59,17 +59,28 @@ class Environment:
         self.ax_price.set_title('Price')
         self.ax_price.set_xlabel('Time')
         self.ax_price.set_ylabel('Price', color='blue')
+
+        self.fig_reward, self.ax_reward = plt.subplots()
+        self.ax_reward.set_title('Reward & Profit')
+        self.ax_price.set_xlabel('Time')
+        self.ax_pnl.set_ylabel('PnL', color='green')
         
 
         # Create lines for realized PnL, unrealized PnL, and close price
         self.line_realized_pnl, = self.ax_pnl.plot([], [], color='green', label='Realized PnL')
-        self.ax_pnl.grid(True)
         self.line_unrealized_pnl, = self.ax_pnl.plot([], [], color='blue', label='Unrealized PnL')
         self.line_price, = self.ax_price.plot([], [], color='blue', label='Close Price')
 
         # Initialize scatter plots for buy and sell markers
         self.buy_scatter = self.ax_price.scatter([], [], marker='^', color='green', label='Buy', s=25)
         self.sell_scatter = self.ax_price.scatter([], [], marker='v', color='red', label='Sell', s=25)
+
+        self.line_realized_pnl_reward, = self.ax_reward.plot([], [], color='green', label="Realized PnL")
+        self.line_reward, = self.ax_reward.plot([], [], color='red', label='Reward')
+
+        self.ax_reward.grid(True)
+        self.ax_pnl.grid(True)
+        self.ax_price.grid(True)
 
         # Make sure to add the legend for better visualization
         self.ax_pnl.legend()
@@ -93,6 +104,9 @@ class Environment:
             initial_price_y_max = self.data['Close'].max() * 1.05
             self.ax_price.set_ylim(initial_price_y_min, initial_price_y_max)
 
+            self.ax_reward.set_xlim(self.data.index[0], self.data.index[-1])
+            self.ax_reward.set_ylim(initial_price_y_min, initial_price_y_max)
+
         if self.step > 0:
             # Update PnL lines
             self.line_realized_pnl.set_data(self.data.index[:self.step], self.profit_history[:self.step])
@@ -100,6 +114,9 @@ class Environment:
 
             # Update Price line
             self.line_price.set_data(self.data.index[:self.step], self.data['Close'].iloc[:self.step])
+
+            self.line_reward.set_data(self.data.index[:self.step], self.reward_history[:self.step])
+            self.line_realized_pnl_reward.set_data(self.data.index[:self.step], self.profit_history[:self.step])
 
             # Update the axes dynamically for PnL
             self.ax_pnl.relim()
@@ -136,7 +153,6 @@ class Environment:
             # Draw and pause for dynamic updates
             plt.draw()
             plt.pause(0.0005)
-
 
     # Move forward
     def forward(self, action):
@@ -182,14 +198,14 @@ class Environment:
             if action == Actions.Sell:
                 profit = current_price - self.entry_price
                 self._realized_pnl += profit
-                reward = profit
+                reward = self._realized_pnl
                 self.sell_signals.append((current_time, current_price))  # Mark sell signal
                 print(f"Closed Long at {current_price}, Realized Profit: {profit}")
                 self.position = None  # Position closed
                 self.entry_price = None
                 self._unrealized_pnl = 0  # Reset unrealized PnL when position is closed
             else:
-                reward = self._unrealized_pnl
+                reward = self._realized_pnl
 
         elif self.position == Positions.Short:
             # If holding a short position, calculate unrealized PnL
@@ -198,14 +214,14 @@ class Environment:
             if action == Actions.Buy:
                 profit = self.entry_price - current_price
                 self._realized_pnl += profit
-                reward = profit
+                reward = self._realized_pnl
                 self.buy_signals.append((current_time, current_price))  # Mark buy signal
                 print(f"Closed Short at {current_price}, Realized Profit: {profit}")
                 self.position = None  # Position closed
                 self.entry_price = None
                 self._unrealized_pnl = 0  # Reset unrealized PnL when position is closed
             else:
-                reward = self._unrealized_pnl
+                reward = self._realized_pnl
 
         self._total_reward += reward
         return reward
@@ -213,6 +229,10 @@ class Environment:
     #########################################################################################################################################
 
     def reset(self):
+        plt.close(self.fig_pnl)
+        plt.close(self.fig_price)
+        plt.close(self.fig_reward)
+        # Reset internal variables
         self._truncated = False
         self.step = 0
         self._realized_pnl = 0
@@ -221,9 +241,32 @@ class Environment:
         self._total_reward = 0
         self.position = None
         self.entry_price = None
-        self._first_rendering = True
-        self.render();
-        
+        self._first_rendering = True  # Ensure chart is re-initialized
+
+        # Recreate figures for new episode
+        self.fig_pnl, self.ax_pnl = plt.subplots()
+        self.ax_pnl.set_title('Realized and Unrealized PnL')
+        self.ax_pnl.set_xlabel('Time')
+        self.ax_pnl.set_ylabel('PnL', color='green')
+
+        self.fig_price, self.ax_price = plt.subplots()
+        self.ax_price.set_title('Price')
+        self.ax_price.set_xlabel('Time')
+        self.ax_price.set_ylabel('Price', color='blue')
+
+        # Recreate line and scatter objects for new episode
+        self.line_realized_pnl, = self.ax_pnl.plot([], [], color='green', label='Realized PnL')
+        self.ax_pnl.grid(True)
+        self.line_unrealized_pnl, = self.ax_pnl.plot([], [], color='blue', label='Unrealized PnL')
+        self.line_price, = self.ax_price.plot([], [], color='blue', label='Close Price')
+
+        self.buy_scatter = self.ax_price.scatter([], [], marker='^', color='green', label='Buy', s=25)
+        self.sell_scatter = self.ax_price.scatter([], [], marker='v', color='red', label='Sell', s=25)
+
+        # Ensure the legends are added
+        self.ax_pnl.legend()
+
+        self.render()
         return self.current_data()
     
     def current_data(self):
@@ -249,6 +292,6 @@ class Environment:
         return self.current_data()
    
     def close(self):
-        plt.close()
-   
+        plt.close(self.fig_pnl)
+        plt.close(self.fig_price)
     #########################################################################################################################################
