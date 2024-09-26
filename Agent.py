@@ -11,7 +11,7 @@ import tracemalloc
 # Constants for memory and training
 MAX_MEMORY = 100_000
 BATCH_SIZE = 32
-LR = 0.001
+LR = 0.5
 
 class Agent:
     def __init__(self, environment):
