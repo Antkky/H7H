@@ -21,10 +21,11 @@ class Agent:
         self.n_trades = 0
         self.epsilon = 1.0
         self.gamma = 0.95
+        self.input_size = 11
 
         self.memory = deque(maxlen=MAX_MEMORY)
 
-        self.model = LSTM_Q_Net(input_size=10, hidden_size=256, output_size=2).to(device) # Initializes  Neural Network
+        self.model = LSTM_Q_Net(input_size=self.input_size, hidden_size=256, output_size=2).to(device) # Initializes  Neural Network
         
         if (len(args) > 1):
             self.model.load_state_dict(torch.load(self.file, weights_only=True))
@@ -51,8 +52,8 @@ class Agent:
         states, actions, rewards, next_states, dones = zip(*mini_batch)
 
         # Convert to Tensors and reshape
-        states = torch.tensor(np.array(states), dtype=torch.float).to(device).view(BATCH_SIZE, self.window_size, 10)
-        next_states = torch.tensor(np.array(next_states), dtype=torch.float).to(device).view(BATCH_SIZE, self.window_size, 10)
+        states = torch.tensor(np.array(states), dtype=torch.float).to(device).view(BATCH_SIZE, self.window_size, self.input_size)
+        next_states = torch.tensor(np.array(next_states), dtype=torch.float).to(device).view(BATCH_SIZE, self.window_size, self.input_size)
         actions = torch.tensor(actions, dtype=torch.long).to(device)
         rewards = torch.tensor(rewards, dtype=torch.float).to(device)
         dones = torch.tensor(dones, dtype=torch.bool).to(device)

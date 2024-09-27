@@ -2,7 +2,7 @@
     "files.exclude": {
         "**/.git": true,
         "**/.gitattributes": true,
-        "**/.gitignore": true,
+        "**/.gitignore": false,
         "**/.svn": true,
         "**/.hg": true,
         "**/CVS": true,

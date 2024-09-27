@@ -40,18 +40,11 @@ class QTrainer:
         self.batch_size = BATCH_SIZE
 
     def train_step(self, state, action, reward, next_state, done):
-        # Convert to Tensors
-        state = torch.tensor(np.array(state.cpu()), dtype=torch.float).to(device)
-        next_state = torch.tensor(np.array(next_state.cpu()), dtype=torch.float).to(device)
-        action = torch.tensor(np.array(action.cpu()), dtype=torch.long).to(device)
-        reward = torch.tensor(np.array(reward.cpu()), dtype=torch.float).to(device)
-        done = torch.tensor(np.array(done.cpu()), dtype=torch.bool).to(device)
-
         # Ensure correct shape for LSTM (batch_size, sequence_length, input_size)
         if state.dim() == 2:  # Assuming input shape (batch_size, input_size)
-            state = state.view(-1, 60, 10)  # Adjust based on your actual input sizes
+            state = state.view(-1, 30, 11)  # Adjust based on your actual input sizes
         if next_state.dim() == 2:
-            next_state = next_state.view(-1, 60, 10)  # Adjust accordingly
+            next_state = next_state.view(-1, 30, 11)  # Adjust accordingly
 
         # Q values for current state
         pred = self.model(state)  # Output: [batch_size, num_actions]
