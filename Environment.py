@@ -38,6 +38,9 @@ class Environment:
         self.buy_signals = []  # Track Buy signals
         self.sell_signals = []  # Track Sell signals
 
+        self.winning_streak = 0
+        self.losing_streak = 0
+
         #########################################################################################################################################
 
         # Data Preprocessing
@@ -150,70 +153,42 @@ class Environment:
         self.step += 1
         new_state = self.current_data()
 
-        reward = self.calculate_reward(action)  # Calculate the reward based on action
+        reward = self.execute(action) # Execute Action
         done = self.step + self.window_size >= len(self.data)  # Stop when reaching the end
 
         # Store PnL & Reward
         self.profit_history.append(self._realized_pnl)
         self.unrealized_pnl_history.append(self._unrealized_pnl)
-        self.reward_history.append(reward)
+        self.reward_history.append(self._total_reward)
 
         self.render()
 
         return new_state, reward, self._realized_pnl, self._unrealized_pnl, done
     
-    # Calculate reward and PnL
-    def calculate_reward(self, action):
+
+    def execute(self, action):
         current_price = self.data['Close'].iloc[self.step]
         current_time = self.data.index[self.step]
 
+        reward = 0
+
         if self.position is None:
-            # No position held
             if action == Actions.Buy:
-                self.position = Positions.Long
-                self.entry_price = current_price
-                self._unrealized_pnl = 0
-                self.buy_signals.append((current_time, current_price))  # Append buy signal
-                return 0
+                self.long_entry(current_price, current_time)
+
             elif action == Actions.Sell:
-                self.position = Positions.Short
-                self.entry_price = current_price
-                self._unrealized_pnl = 0
-                self.sell_signals.append((current_time, current_price))  # Append sell signal
-                return 0
+                self.short_entry(current_price, current_time)
 
         elif self.position == Positions.Long:
-            # If holding a long position, calculate unrealized PnL
             self._unrealized_pnl = current_price - self.entry_price
-
             if action == Actions.Sell:
-                profit = current_price - self.entry_price
-                self._realized_pnl += profit
-                reward = self._realized_pnl
-                self.sell_signals.append((current_time, current_price))  # Mark sell signal
-                print(f"Closed Long at {current_price}, Realized Profit: {profit}")
-                self.position = None  # Position closed
-                self.entry_price = None
-                self._unrealized_pnl = 0  # Reset unrealized PnL when position is closed
-            else:
-                reward = self._realized_pnl
-
+                reward += self.long_exit(current_price, current_time)
+        
         elif self.position == Positions.Short:
-            # If holding a short position, calculate unrealized PnL
             self._unrealized_pnl = self.entry_price - current_price
-
             if action == Actions.Buy:
-                profit = self.entry_price - current_price
-                self._realized_pnl += profit
-                reward = self._realized_pnl
-                self.buy_signals.append((current_time, current_price))  # Mark buy signal
-                print(f"Closed Short at {current_price}, Realized Profit: {profit}")
-                self.position = None  # Position closed
-                self.entry_price = None
-                self._unrealized_pnl = 0  # Reset unrealized PnL when position is closed
-            else:
-                reward = self._realized_pnl
-
+                reward += self.short_exit(current_price, current_time)
+            
         self._total_reward += reward
         return reward
     
@@ -228,14 +203,15 @@ class Environment:
         self.step = 0
         self._realized_pnl = 0
         self._unrealized_pnl = 0
-        self.profit_history = []  # Initialize with a starting point for profit
+        self.profit_history = []
         self.reward_history = []
         self.unrealized_pnl_history = []
         self._total_reward = 0
         self.position = None
         self.entry_price = None
-        self._first_rendering = True  # Ensure chart is re-initialized
-        self.render();
+        self._first_rendering = True
+        self.winning_streak = 0
+        self.losing_streak = 0
 
         # Recreate figures for new episode
         self.fig_pnl, self.ax_pnl = plt.subplots()
@@ -298,4 +274,80 @@ class Environment:
     def close(self):
         plt.close(self.fig_pnl)
         plt.close(self.fig_price)
+        print("closing")
+
     #########################################################################################################################################
+    
+    def long_entry(self, price, time):
+        self.position = Positions.Long
+        self.entry_price = price
+        self._unrealized_pnl = 0
+        self.buy_signals.append((time, price))
+        print(f"Opened Long")
+
+    def short_entry(self, price, time):
+        self.position = Positions.Short
+        self.entry_price = price
+        self._unrealized_pnl = 0
+        self.sell_signals.append((time, price))
+        print(f"Opened Short")
+
+    def long_exit(self, price, time):
+        profit = price - self.entry_price
+        self._realized_pnl += profit
+        reward = 0
+
+        if profit > 0:
+            reward += 10
+            self.losing_streak = 0
+            self.winning_streak += 1
+        else:
+            reward += -15
+            self.winning_streak = 0
+            self.losing_streak += 1
+
+        if self.winning_streak > 5:
+            reward += 25
+        elif self.losing_streak > 5:
+            reward += -35
+    
+        # Log
+        self.sell_signals.append((time, price))  # Mark sell signal
+        print(f"Closed Long, Realized Profit: {profit}, Total Profit: {self._realized_pnl}")
+
+        # Close Position
+        self.position = None
+        self.entry_price = None
+        self._unrealized_pnl = 0
+
+        return reward
+
+    def short_exit(self, price, time):
+        profit = self.entry_price - price
+        self._realized_pnl += profit
+        reward = 0
+        
+        if profit > 0:
+            reward += 10
+            self.losing_streak = 0
+            self.winning_streak += 1
+        else:
+            reward += -15
+            self.winning_streak = 0
+            self.losing_streak += 1
+
+        if self.winning_streak > 5:
+            reward += 25
+        elif self.losing_streak > 5:
+            reward += -35
+
+        # Log
+        self.buy_signals.append((time, price))
+        print(f"Closed Short, Realized Profit: {profit}, Total Profit: {self._realized_pnl}")
+
+        # Close Position
+        self.position = None
+        self.entry_price = None
+        self._unrealized_pnl = 0
+
+        return reward

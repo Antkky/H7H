@@ -41,11 +41,11 @@ class QTrainer:
 
     def train_step(self, state, action, reward, next_state, done):
         # Convert to Tensors
-        state = torch.tensor(np.array(state), dtype=torch.float).to(device)
-        next_state = torch.tensor(np.array(next_state), dtype=torch.float).to(device)
-        action = torch.tensor(np.array(action), dtype=torch.long).to(device)
-        reward = torch.tensor(np.array(reward), dtype=torch.float).to(device)
-        done = torch.tensor(np.array(done), dtype=torch.bool).to(device)
+        state = torch.tensor(np.array(state.cpu()), dtype=torch.float).to(device)
+        next_state = torch.tensor(np.array(next_state.cpu()), dtype=torch.float).to(device)
+        action = torch.tensor(np.array(action.cpu()), dtype=torch.long).to(device)
+        reward = torch.tensor(np.array(reward.cpu()), dtype=torch.float).to(device)
+        done = torch.tensor(np.array(done.cpu()), dtype=torch.bool).to(device)
 
         # Ensure correct shape for LSTM (batch_size, sequence_length, input_size)
         if state.dim() == 2:  # Assuming input shape (batch_size, input_size)
@@ -72,3 +72,4 @@ class QTrainer:
         self.optimizer.step()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+

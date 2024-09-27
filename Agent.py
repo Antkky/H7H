@@ -45,7 +45,6 @@ class Agent:
 
     def train(self):
         if len(self.memory) < BATCH_SIZE:
-            print("Not enough experiences to sample")
             return  # Not enough experiences to sample
 
         mini_batch = random.sample(self.memory, BATCH_SIZE)
