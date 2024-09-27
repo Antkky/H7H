@@ -11,8 +11,8 @@ import sys
 
 # Constants for memory and training
 MAX_MEMORY = 100_000
-BATCH_SIZE = 32
-LR = 0.05
+BATCH_SIZE = 64
+LR = 0.01
 
 class Agent:
     def __init__(self, df, args=""):
@@ -20,7 +20,7 @@ class Agent:
         self.file = args
         self.n_trades = 0
         self.epsilon = 1.0
-        self.gamma = 0.9
+        self.gamma = 0.95
 
         self.memory = deque(maxlen=MAX_MEMORY)
 
@@ -61,7 +61,7 @@ class Agent:
 
     def update_epsilon(self):
         if self.epsilon > 0.01:  # Min epsilon
-            self.epsilon *= 0.995  # Decay epsilon
+            self.epsilon *= 0.99  # Decay epsilon
 
     def save(self, episode):
         name = "Episode-" + str(episode) + ".pth"

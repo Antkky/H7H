@@ -40,6 +40,7 @@ class Environment:
 
         self.winning_streak = 0
         self.losing_streak = 0
+        self.streak_rewarded = False
 
         #########################################################################################################################################
 
@@ -50,44 +51,31 @@ class Environment:
 
         #########################################################################################################################################
 
-        # Initialize a plot figure for PnL
-        self.fig_pnl, self.ax_pnl = plt.subplots()
-        self.ax_pnl.set_title('Realized and Unrealized PnL')
-        self.ax_pnl.set_xlabel('Time')
-        self.ax_pnl.set_ylabel('PnL', color='green')
-
-
         # Initialize a plot figure for Price
         self.fig_price, self.ax_price = plt.subplots()
+
         self.ax_price.set_title('Price')
         self.ax_price.set_xlabel('Time')
         self.ax_price.set_ylabel('Price', color='blue')
 
-        self.fig_reward, self.ax_reward = plt.subplots()
-        self.ax_reward.set_title('Reward & Profit')
-        self.ax_reward.set_xlabel('Time')
-        self.ax_reward.set_ylabel('PnL', color='green')
-        
+        self.ax_pnl = self.ax_price.twinx()
 
         # Create lines for realized PnL, unrealized PnL, and close price
         self.line_realized_pnl, = self.ax_pnl.plot([], [], color='green', label='Realized PnL')
         self.line_unrealized_pnl, = self.ax_pnl.plot([], [], color='blue', label='Unrealized PnL')
-        self.line_price, = self.ax_price.plot([], [], color='blue', label='Close Price')
+        self.line_price, = self.ax_price.plot([], [], color='black', label='Close Price')
 
         # Initialize scatter plots for buy and sell markers
         self.buy_scatter = self.ax_price.scatter([], [], marker='^', color='green', label='Buy', s=25)
         self.sell_scatter = self.ax_price.scatter([], [], marker='v', color='red', label='Sell', s=25)
 
-        self.line_realized_pnl_reward, = self.ax_reward.plot([], [], color='green', label="Realized PnL")
-        self.line_reward, = self.ax_reward.plot([], [], color='red', label='Reward')
+        self.line_reward, = self.ax_pnl.plot([], [], color='red', label='Reward')
 
-        self.ax_reward.grid(True)
-        self.ax_pnl.grid(True)
         self.ax_price.grid(True)
 
-        # Make sure to add the legend for better visualization
+        # Make sure to add the legend for better visualizaton
+        self.ax_price.legend()
         self.ax_pnl.legend()
-
         #########################################################################################################################################
 
     def render(self):
@@ -95,60 +83,54 @@ class Environment:
         if self._first_rendering:
             self._first_rendering = False
             plt.ion()
-            plt.show(block=False)
+            #plt.show(block=False)
 
         if self.step > 0:
-            # Update PnL lines
-            self.line_realized_pnl.set_data(self.data.index[:self.step], self.profit_history[:self.step])
-            self.line_unrealized_pnl.set_data(self.data.index[:self.step], self.unrealized_pnl_history[:self.step])
+            done = False
+            while not done:
+                try:
+                    # Update PnL lines
+                    self.line_realized_pnl.set_data(self.data.index[:self.step], self.profit_history[:self.step])
+                    self.line_unrealized_pnl.set_data(self.data.index[:self.step], self.unrealized_pnl_history[:self.step])
 
-            # Update Price line
-            self.line_price.set_data(self.data.index[:self.step], self.data['Close'].iloc[:self.step])
+                    # Update Price line
+                    self.line_price.set_data(self.data.index[:self.step], self.data['Close'].iloc[:self.step])
 
-            self.line_reward.set_data(self.data.index[:self.step], self.reward_history[:self.step])
-            self.line_realized_pnl_reward.set_data(self.data.index[:self.step], self.profit_history[:self.step])
+                    self.line_reward.set_data(self.data.index[:self.step], self.reward_history[:self.step])
 
-            # Update the axes dynamically for PnL
-            self.ax_pnl.relim()
-            self.ax_pnl.autoscale_view()
 
-            # Dynamically update y-limits for PnL
-            current_min_y = min(self.profit_history + self.unrealized_pnl_history) * 1.05
-            current_max_y = max(self.profit_history + self.unrealized_pnl_history) * 1.05
-            if current_min_y == current_max_y:
-                current_max_y += 1
-            self.ax_pnl.set_ylim(current_min_y, current_max_y)
+                    # Update the axes dynamically for Price
+                    self.ax_price.relim()
+                    self.ax_price.autoscale_view()
+                    self.ax_pnl.relim()
+                    self.ax_pnl.autoscale_view()
 
-            # Update the axes dynamically for Price
-            self.ax_price.relim()
-            self.ax_price.autoscale_view()
+                    # Plot buy and sell signals
+                    buy_indices = [i for i in range(len(self.buy_signals)) if self.buy_signals[i][1] > 0]
+                    sell_indices = [i for i in range(len(self.sell_signals)) if self.sell_signals[i][1] > 0]
 
-             # Update the axes dynamically for PnL
-            self.ax_reward.relim()
-            self.ax_reward.autoscale_view()
+                    # Extract timestamps and y-values for buy/sell signals
+                    buy_times = [self.buy_signals[i][0] for i in buy_indices]
+                    buy_prices = [self.buy_signals[i][1] for i in buy_indices]
 
-            # Plot buy and sell signals
-            buy_indices = [i for i in range(len(self.buy_signals)) if self.buy_signals[i][1] > 0]
-            sell_indices = [i for i in range(len(self.sell_signals)) if self.sell_signals[i][1] > 0]
+                    sell_times = [self.sell_signals[i][0] for i in sell_indices]
+                    sell_prices = [self.sell_signals[i][1] for i in sell_indices]
 
-            # Extract timestamps and y-values for buy/sell signals
-            buy_times = [self.buy_signals[i][0] for i in buy_indices]
-            buy_prices = [self.buy_signals[i][1] for i in buy_indices]
+                    # Set offsets for buy and sell signals (timestamps and corresponding price)
+                    if buy_indices:
+                        self.buy_scatter.set_offsets(np.column_stack((buy_times, buy_prices)))
+                    if sell_indices:
+                        self.sell_scatter.set_offsets(np.column_stack((sell_times, sell_prices)))
 
-            sell_times = [self.sell_signals[i][0] for i in sell_indices]
-            sell_prices = [self.sell_signals[i][1] for i in sell_indices]
+                    # Draw and pause for dynamic updates
+                    plt.draw()
+                    plt.pause(0.005)
+                    done = True
 
-            # Set offsets for buy and sell signals (timestamps and corresponding price)
-            if buy_indices:
-                self.buy_scatter.set_offsets(np.column_stack((buy_times, buy_prices)))
-            if sell_indices:
-                self.sell_scatter.set_offsets(np.column_stack((sell_times, sell_prices)))
+                except ValueError:
+                    continue
+            
 
-            # Draw and pause for dynamic updates
-            plt.draw()
-            plt.pause(0.0005)
-
-    # Move forward
     def forward(self, action):
         self.step += 1
         new_state = self.current_data()
@@ -164,7 +146,6 @@ class Environment:
         self.render()
 
         return new_state, reward, self._realized_pnl, self._unrealized_pnl, done
-    
 
     def execute(self, action):
         current_price = self.data['Close'].iloc[self.step]
@@ -195,9 +176,7 @@ class Environment:
     #########################################################################################################################################
 
     def reset(self):
-        plt.close(self.fig_pnl)
         plt.close(self.fig_price)
-        plt.close(self.fig_reward)
         # Reset internal variables
         self._truncated = False
         self.step = 0
@@ -212,41 +191,34 @@ class Environment:
         self._first_rendering = True
         self.winning_streak = 0
         self.losing_streak = 0
+        self.streak_rewarded = False
 
-        # Recreate figures for new episode
-        self.fig_pnl, self.ax_pnl = plt.subplots()
-        self.ax_pnl.set_title('Realized and Unrealized PnL')
-        self.ax_pnl.set_xlabel('Time')
-        self.ax_pnl.set_ylabel('PnL', color='green')
-
+        # Initialize a plot figure for Price
         self.fig_price, self.ax_price = plt.subplots()
+
         self.ax_price.set_title('Price')
         self.ax_price.set_xlabel('Time')
         self.ax_price.set_ylabel('Price', color='blue')
 
-        self.fig_reward, self.ax_reward = plt.subplots()
-        self.ax_reward.set_title('Reward & Profit')
-        self.ax_reward.set_xlabel('Time')
-        self.ax_reward.set_ylabel('PnL', color='green')
+        self.ax_pnl = self.ax_price.twinx()
 
-        # Recreate line and scatter objects for new episode
+        # Create lines for realized PnL, unrealized PnL, and close price
         self.line_realized_pnl, = self.ax_pnl.plot([], [], color='green', label='Realized PnL')
-        self.ax_pnl.grid(True)
         self.line_unrealized_pnl, = self.ax_pnl.plot([], [], color='blue', label='Unrealized PnL')
-        self.line_price, = self.ax_price.plot([], [], color='blue', label='Close Price')
+        self.line_price, = self.ax_price.plot([], [], color='black', label='Close Price')
 
+        # Initialize scatter plots for buy and sell markers
         self.buy_scatter = self.ax_price.scatter([], [], marker='^', color='green', label='Buy', s=25)
         self.sell_scatter = self.ax_price.scatter([], [], marker='v', color='red', label='Sell', s=25)
 
-        self.line_realized_pnl_reward, = self.ax_reward.plot([], [], color='green', label="Realized PnL")
-        self.line_reward, = self.ax_reward.plot([], [], color='red', label='Reward')
+        self.line_reward, = self.ax_pnl.plot([], [], color='red', label='Reward')
 
-        self.ax_reward.grid(True)
+        self.ax_price.grid(True)
 
-        # Ensure the legends are added
+        # Make sure to add the legend for better visualizaton
+        self.ax_price.legend()
         self.ax_pnl.legend()
 
-        self.render()
         return self.current_data()
     
     def current_data(self):
@@ -298,22 +270,22 @@ class Environment:
         reward = 0
 
         if profit > 0:
-            reward += 10
-            self.losing_streak = 0
-            self.winning_streak += 1
-        else:
-            reward += -15
-            self.winning_streak = 0
-            self.losing_streak += 1
-
-        if self.winning_streak > 5:
-            reward += 25
-        elif self.losing_streak > 5:
-            reward += -35
+            reward += self.winning_trade() # 10
+            if profit > 25:
+                reward += self.big_winning_trade() # 20
+            elif profit > 50:
+                reward += 50 
+                
+        elif profit < 0:
+            reward += self.losing_trade() # -10
+            if profit < -25:
+                reward += self.big_losing_trade() # -20
+            elif profit < -50:
+                reward += -50
     
         # Log
         self.sell_signals.append((time, price))  # Mark sell signal
-        print(f"Closed Long, Realized Profit: {profit}, Total Profit: {self._realized_pnl}")
+        print(f"Closed Long, Realized Profit: {profit}, Total Profit: {self._realized_pnl}, Total Reward: {self._total_reward}")
 
         # Close Position
         self.position = None
@@ -328,22 +300,22 @@ class Environment:
         reward = 0
         
         if profit > 0:
-            reward += 10
-            self.losing_streak = 0
-            self.winning_streak += 1
-        else:
-            reward += -15
-            self.winning_streak = 0
-            self.losing_streak += 1
-
-        if self.winning_streak > 5:
-            reward += 25
-        elif self.losing_streak > 5:
-            reward += -35
+            reward += self.winning_trade() # 10
+            if profit > 25:
+                reward += self.big_winning_trade() # 20
+            elif profit > 50:
+                reward += 50 
+                
+        elif profit < 0:
+            reward += self.losing_trade() # -10
+            if profit < -25:
+                reward += self.big_losing_trade() # -20
+            elif profit < -50:
+                reward += -50
 
         # Log
         self.buy_signals.append((time, price))
-        print(f"Closed Short, Realized Profit: {profit}, Total Profit: {self._realized_pnl}")
+        print(f"Closed Short, Realized Profit: {profit}, Total Profit: {self._realized_pnl}, Total Reward: {self._total_reward}")
 
         # Close Position
         self.position = None
@@ -351,3 +323,17 @@ class Environment:
         self._unrealized_pnl = 0
 
         return reward
+    
+    #########################################################################################################################################
+
+    def winning_trade(self):
+        return 10
+
+    def losing_trade(self):
+        return -10
+    
+    def big_winning_trade(self):
+        return 20
+    
+    def big_losing_trade(self):
+        return -20
