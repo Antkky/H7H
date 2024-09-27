@@ -72,8 +72,6 @@ class Environment:
         self.buy_scatter = self.ax_price.scatter([], [], marker='^', color='green', label='Buy', s=25)
         self.sell_scatter = self.ax_price.scatter([], [], marker='v', color='red', label='Sell', s=25)
 
-        self.line_reward, = self.ax_pnl.plot([], [], color='red', label='Reward')
-
         self.ax_price.grid(True)
 
         # Make sure to add the legend for better visualizaton
@@ -97,8 +95,6 @@ class Environment:
 
                     # Update Price line
                     self.line_price.set_data(self.data.index[:self.step], self.data['Close'].iloc[:self.step])
-
-                    self.line_reward.set_data(self.data.index[:self.step], self.reward_history[:self.step])
                     # Update the axes dynamically for Price
                     self.ax_price.relim()
                     self.ax_price.autoscale_view()
@@ -218,7 +214,6 @@ class Environment:
         self.buy_scatter = self.ax_price.scatter([], [], marker='^', color='green', label='Buy', s=25)
         self.sell_scatter = self.ax_price.scatter([], [], marker='v', color='red', label='Sell', s=25)
 
-        self.line_reward, = self.ax_pnl.plot([], [], color='red', label='Reward')
 
         self.ax_price.grid(True)
 
@@ -276,17 +271,17 @@ class Environment:
 
         if profit > 0:
             reward += self.winning_trade() # 10
-            if profit > 25:
+            if profit > 35:
                 reward += self.big_winning_trade() # 20
-                if profit > 50:
-                    reward += 50
+                if profit > 100:
+                    reward += profit
                 
         elif profit < 0:
             reward += self.losing_trade() # -10
-            if profit < -25:
+            if profit < -35:
                 reward += self.big_losing_trade() # -20
-                if profit < -50:
-                    reward += -50
+                if profit < -100:
+                    reward += profit
     
         # Log
         self.sell_signals.append((time, self.current_price))  # Mark sell signal
@@ -308,17 +303,17 @@ class Environment:
         
         if profit > 0:
             reward += self.winning_trade() # 10
-            if profit > 25:
+            if profit > 35:
                 reward += self.big_winning_trade() # 20
-                if profit > 50:
-                    reward += 100
+                if profit > 100:
+                    reward += profit
                 
         elif profit < 0:
             reward += self.losing_trade() # -10
-            if profit < -25:
+            if profit < -35:
                 reward += self.big_losing_trade() # -20
-                if profit < -50:
-                    reward += -100
+                if profit < -100:
+                    reward += profit
 
         # Log
         self.buy_signals.append((time, self.current_price))

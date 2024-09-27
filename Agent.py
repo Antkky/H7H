@@ -25,7 +25,7 @@ class Agent:
 
         self.memory = deque(maxlen=MAX_MEMORY)
 
-        self.model = LSTM_Q_Net(input_size=self.input_size, hidden_size=256, output_size=2).to(device) # Initializes  Neural Network
+        self.model = LSTM_Q_Net(input_size=self.input_size, hidden_size=64, output_size=2).to(device) # Initializes  Neural Network
         
         if (len(args) > 1):
             self.model.load_state_dict(torch.load(self.file, weights_only=True))
@@ -37,32 +37,50 @@ class Agent:
         self.sell_signals = []
 
     def get_action(self, state):
-        state_tensor = torch.tensor(state.values, dtype=torch.float).unsqueeze(0).to(device)
+        if random.random() < self.epsilon:
+            return random.choice([0, 1])  # Assuming two actions: buy or sell
+        state_tensor = torch.tensor(state.values, dtype=torch.float32).unsqueeze(0).to(device)
         q_values = self.model(state_tensor)
         return torch.argmax(q_values).item()
             
     def store_experience(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done))
+        clipped_reward = np.clip(reward, -1, 1)
+        self.memory.append((state, action, clipped_reward, next_state, done))
+
+    def sample_prioritized(self):
+        # Calculate absolute rewards as priorities
+        priorities = np.array([abs(self.memory[i][2]) for i in range(len(self.memory))])
+        # Convert NaNs or Infs to a small number (e.g., 1e-6 to avoid division by zero)
+        priorities = np.nan_to_num(priorities, nan=1e-6, posinf=1e-6, neginf=1e-6)
+        # If the sum of priorities is zero (rare but possible), assign uniform probability
+        if np.sum(priorities) == 0:
+            probs = np.ones_like(priorities) / len(priorities)  # Uniform distribution
+        else:
+            probs = priorities / np.sum(priorities)  # Normalize to get probabilities
+        # Sample indices based on calculated probabilities
+        idxs = np.random.choice(len(self.memory), BATCH_SIZE, p=probs)
+        mini_batch = [self.memory[i] for i in idxs]
+        return mini_batch
 
     def train(self):
         if len(self.memory) < BATCH_SIZE:
             return  # Not enough experiences to sample
 
-        mini_batch = random.sample(self.memory, BATCH_SIZE)
+        #mini_batch = random.sample(self.memory, BATCH_SIZE)
+        mini_batch = self.sample_prioritized()
         states, actions, rewards, next_states, dones = zip(*mini_batch)
 
         # Convert to Tensors and reshape
-        states = torch.tensor(np.array(states), dtype=torch.float).to(device).view(BATCH_SIZE, self.window_size, self.input_size)
-        next_states = torch.tensor(np.array(next_states), dtype=torch.float).to(device).view(BATCH_SIZE, self.window_size, self.input_size)
+        states = torch.tensor(np.array(states), dtype=torch.float32).to(device).view(BATCH_SIZE, self.window_size, self.input_size)
+        next_states = torch.tensor(np.array(next_states), dtype=torch.float32).to(device).view(BATCH_SIZE, self.window_size, self.input_size)
         actions = torch.tensor(actions, dtype=torch.long).to(device)
-        rewards = torch.tensor(rewards, dtype=torch.float).to(device)
+        rewards = torch.tensor(rewards, dtype=torch.float32).to(device)
         dones = torch.tensor(dones, dtype=torch.bool).to(device)
 
         self.trainer.train_step(states, actions, rewards, next_states, dones)
 
     def update_epsilon(self):
-        if self.epsilon > 0.01:  # Min epsilon
-            self.epsilon *= 0.99  # Decay epsilon
+        self.epsilon = max(0.01, self.epsilon * 0.99)  # Faster decay
 
     def save(self, episode):
         name = "Episode-" + str(episode) + ".pth"
@@ -93,8 +111,6 @@ class Agent:
             self.save(episode)
             print(f"Episode: {episode}\nReward: {total_reward}\nProfit: {unrealprofit}")
 
-
-
 if __name__ == "__main__":
     df = pd.read_csv('trade_data.csv')
     
@@ -111,5 +127,5 @@ if __name__ == "__main__":
     else:
         arg = ""
 
-    agent = Agent(df, arg)
+    agent = Agent(df_minmax, arg)
     agent.run(episodes=50)
