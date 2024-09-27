@@ -62,8 +62,8 @@ class Environment:
 
         self.fig_reward, self.ax_reward = plt.subplots()
         self.ax_reward.set_title('Reward & Profit')
-        self.ax_price.set_xlabel('Time')
-        self.ax_pnl.set_ylabel('PnL', color='green')
+        self.ax_reward.set_xlabel('Time')
+        self.ax_reward.set_ylabel('PnL', color='green')
         
 
         # Create lines for realized PnL, unrealized PnL, and close price
@@ -93,19 +93,6 @@ class Environment:
             self._first_rendering = False
             plt.ion()
             plt.show(block=False)
-            # Set initial x and y limits for PnL and Price
-            self.ax_pnl.set_xlim(self.data.index[0], self.data.index[-1])
-            initial_pnl_y_min = self.data['Close'].min() * 0.95
-            initial_pnl_y_max = self.data['Close'].max() * 1.05
-            self.ax_pnl.set_ylim(initial_pnl_y_min, initial_pnl_y_max)
-
-            self.ax_price.set_xlim(self.data.index[0], self.data.index[-1])
-            initial_price_y_min = self.data['Close'].min() * 0.95
-            initial_price_y_max = self.data['Close'].max() * 1.05
-            self.ax_price.set_ylim(initial_price_y_min, initial_price_y_max)
-
-            self.ax_reward.set_xlim(self.data.index[0], self.data.index[-1])
-            self.ax_reward.set_ylim(initial_price_y_min, initial_price_y_max)
 
         if self.step > 0:
             # Update PnL lines
@@ -132,6 +119,10 @@ class Environment:
             # Update the axes dynamically for Price
             self.ax_price.relim()
             self.ax_price.autoscale_view()
+
+             # Update the axes dynamically for PnL
+            self.ax_reward.relim()
+            self.ax_reward.autoscale_view()
 
             # Plot buy and sell signals
             buy_indices = [i for i in range(len(self.buy_signals)) if self.buy_signals[i][1] > 0]
@@ -244,6 +235,7 @@ class Environment:
         self.position = None
         self.entry_price = None
         self._first_rendering = True  # Ensure chart is re-initialized
+        self.render();
 
         # Recreate figures for new episode
         self.fig_pnl, self.ax_pnl = plt.subplots()
@@ -256,6 +248,11 @@ class Environment:
         self.ax_price.set_xlabel('Time')
         self.ax_price.set_ylabel('Price', color='blue')
 
+        self.fig_reward, self.ax_reward = plt.subplots()
+        self.ax_reward.set_title('Reward & Profit')
+        self.ax_reward.set_xlabel('Time')
+        self.ax_reward.set_ylabel('PnL', color='green')
+
         # Recreate line and scatter objects for new episode
         self.line_realized_pnl, = self.ax_pnl.plot([], [], color='green', label='Realized PnL')
         self.ax_pnl.grid(True)
@@ -264,6 +261,11 @@ class Environment:
 
         self.buy_scatter = self.ax_price.scatter([], [], marker='^', color='green', label='Buy', s=25)
         self.sell_scatter = self.ax_price.scatter([], [], marker='v', color='red', label='Sell', s=25)
+
+        self.line_realized_pnl_reward, = self.ax_reward.plot([], [], color='green', label="Realized PnL")
+        self.line_reward, = self.ax_reward.plot([], [], color='red', label='Reward')
+
+        self.ax_reward.grid(True)
 
         # Ensure the legends are added
         self.ax_pnl.legend()

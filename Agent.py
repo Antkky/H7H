@@ -111,5 +111,5 @@ if __name__ == "__main__":
     else:
         arg = ""
 
-    agent = Agent(df_minmax, arg)
-    agent.run(episodes=100)
+    agent = Agent(df, arg)
+    agent.run(episodes=50)
