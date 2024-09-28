@@ -6,30 +6,27 @@ import numpy as np
 import os
 
 class LSTM_Q_Net(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, dropout=0.3, bidirectional=True):
+    def __init__(self, input_size, hidden_size, output_size, dropout=0.5, bidirectional=True):
         super(LSTM_Q_Net, self).__init__()
-
-
+        
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, 
                             num_layers=5, batch_first=True, 
                             dropout=dropout, bidirectional=bidirectional)
         
         self.ln = nn.LayerNorm(hidden_size * 2 if bidirectional else hidden_size)
         
-        self.fc = nn.Linear(hidden_size * 2 if bidirectional else hidden_size, output_size)
+        # Add a few more fully connected layers for capacity
+        self.fc1 = nn.Linear(hidden_size * 2 if bidirectional else hidden_size, 128)
+        self.fc2 = nn.Linear(128, output_size)
 
     def forward(self, x):
-        # Pass input through LSTM
         lstm_out, _ = self.lstm(x)
-
-        # Get the last time step's output (many-to-one approach)
-        lstm_out = lstm_out[:, -1, :]  # shape: (batch_size, hidden_size * 2) if bidirectional, else (batch_size, hidden_size)
-
-        # Apply layer normalization
+        lstm_out = lstm_out[:, -1, :]  # Get the last time step's output
         lstm_out = self.ln(lstm_out)
-
-        # Pass through the fully connected layer
-        x = self.fc(lstm_out)
+        
+        # Pass through additional layers
+        x = F.relu(self.fc1(lstm_out))
+        x = self.fc2(x)
 
         return x
 
@@ -48,7 +45,7 @@ class QTrainer:
         self.lr = lr
         self.gamma = gamma
         self.model = model
-        self.target_model = LSTM_Q_Net(11, 64, 2) # Target model
+        self.target_model = LSTM_Q_Net(13, 64, 2) # Target model
         self.update_target()
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=10, gamma=0.5)
@@ -61,9 +58,9 @@ class QTrainer:
     def train_step(self, state, action, reward, next_state, done):
         # Ensure correct shape for LSTM (batch_size, sequence_length, input_size)
         if state.dim() == 2:
-            state = state.view(-1, 30, 11)
+            state = state.view(-1, 30, 13)
         if next_state.dim() == 2:
-            next_state = next_state.view(-1, 30, 11)
+            next_state = next_state.view(-1, 30, 13)
 
 
         pred = self.model(state)

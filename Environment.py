@@ -52,6 +52,12 @@ class Environment:
         self.data.columns = features # sets columns attribute
 
         self.data['Unrealized'] = pd.Series(dtype='float')
+        self.data['Realized'] = pd.Series(dtype='float')
+        self.data['Positioned'] = pd.Series(dtype=int)
+
+        columns_to_fill = ['Unrealized', 'Realized', 'Positioned']
+        self.data[columns_to_fill] = self.data[columns_to_fill].fillna(0)
+
 
         #########################################################################################################################################
 
@@ -131,7 +137,7 @@ class Environment:
         self.step += 1
         new_state = self.current_data()
 
-        reward, profit = self.execute(action) # Execute Action
+        reward, profit, positioned = self.execute(action) # Execute Action
         done = self.step + self.window_size >= len(self.data)  # Stop when reaching the end
 
         # Store PnL & Reward
@@ -141,9 +147,21 @@ class Environment:
 
         self.render()
 
-        new_state['Unrealized'] = self._unrealized_pnl
+        match positioned:
+            case Positions.Long:
+                positioned = 1
 
-        return new_state, reward, self._realized_pnl, self._unrealized_pnl, done
+            case Positions.Short:
+                positioned = 2
+
+            case _:
+                positioned = 0
+
+        new_state['Unrealized'] = self._unrealized_pnl
+        new_state['Realized'] = self._realized_pnl
+        new_state['Positioned'] = positioned
+
+        return new_state, reward, self._realized_pnl, self._unrealized_pnl,done
 
     def execute(self, action):
         self.current_price = self.data['Close'].iloc[self.step]
@@ -171,7 +189,7 @@ class Environment:
                 reward += self.short_exit(current_time)
             
         self._total_reward += reward
-        return reward, profit
+        return reward, profit, self.position
     
     def calculate_profit(self):
         return self.current_price - self.entry_price
@@ -196,6 +214,11 @@ class Environment:
         self.streak_rewarded = False
 
         self.data['Unrealized'] = pd.Series(dtype='float')
+        self.data['Realized'] = pd.Series(dtype='float')
+        self.data['Positioned'] = pd.Series(dtype=int)
+
+        columns_to_fill = ['Unrealized', 'Realized', 'Positioned']
+        self.data[columns_to_fill] = self.data[columns_to_fill].fillna(0)
 
         # Initialize a plot figure for Price
         self.fig_price, self.ax_price = plt.subplots()

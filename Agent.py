@@ -19,9 +19,10 @@ class Agent:
         self.window_size = 30
         self.file = args
         self.n_trades = 0
-        self.epsilon = 1.0
+        self.epsilon = 0.01
         self.gamma = 0.95
-        self.input_size = 11
+        self.input_size = 13
+        self.probability_distrabution = None
 
         self.memory = deque(maxlen=MAX_MEMORY)
 
@@ -37,10 +38,21 @@ class Agent:
         self.sell_signals = []
 
     def get_action(self, state):
-        if random.random() < self.epsilon:
-            return random.choice([0, 1])  # Assuming two actions: buy or sell
-        state_tensor = torch.tensor(state.values, dtype=torch.float32).unsqueeze(0).to(device)
-        q_values = self.model(state_tensor)
+
+        # Extract only numeric data
+        if isinstance(state, pd.DataFrame):
+            numeric_state = state.select_dtypes(include=[np.number]).values
+        elif isinstance(state, pd.Series):
+            numeric_state = state.values
+        else:
+            raise ValueError("State must be a Pandas DataFrame or Series.")
+
+        numeric_state = np.nan_to_num(numeric_state, nan=0.0)
+
+        state_tensor = torch.tensor(numeric_state, dtype=torch.float32).unsqueeze(0).to(device)
+        q_values = self.model.forward(state_tensor)
+        self.probability_distrabution = q_values
+        print(torch.tensor(q_values).numpy())
         return torch.argmax(q_values).item()
             
     def store_experience(self, state, action, reward, next_state, done):
@@ -92,7 +104,6 @@ class Agent:
             state = self.env.reset()
             done = False
             total_reward = 0
-
             while not done:
                 action0 = self.get_action(state)
                 match action0:
@@ -110,6 +121,7 @@ class Agent:
             self.update_epsilon()
             self.save(episode)
             print(f"Episode: {episode}\nReward: {total_reward}\nProfit: {unrealprofit}")
+
 
 if __name__ == "__main__":
     df = pd.read_csv('trade_data.csv')
