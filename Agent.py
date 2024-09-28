@@ -12,14 +12,14 @@ import sys
 # Constants for memory and training
 MAX_MEMORY = 100_000
 BATCH_SIZE = 64
-LR = 0.01
+LR = 0.25
 
 class Agent:
     def __init__(self, df, args=""):
         self.window_size = 30
         self.file = args
         self.n_trades = 0
-        self.epsilon = 0.01
+        self.epsilon = 0.25
         self.gamma = 0.95
         self.input_size = 13
         self.probability_distrabution = None
